@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Air Messenger</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="apple-touch-icon" href="icon-512.jpg">
+<link rel="icon" type="image/jpeg" sizes="192x192" href="icon-512.jpg">
+<link rel="icon" type="image/jpeg" sizes="512x512" href="icon-512.jpg">
+
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Air">
+</head>
+<body>
+
+    <div id="onboarding-screen" class="screen">
+        <div class="glass-card center-content">
+            <div class="cloud-logo">☁️</div>
+            <h2>Air Messenger</h2>
+            <p id="install-text">Чтобы пользоваться мессенджером, скачайте его на устройство.</p>
+            <div id="device-instruction" style="margin: 15px 0; font-size: 15px; color: var(--text-muted);"></div>
+            <button id="btn-onboarding-done" class="btn-primary">Понятно</button>
+        </div>
+    </div>
+
+    <div id="auth-screen" class="screen">
+        <div class="glass-card" style="max-height: 85vh; overflow-y: auto;">
+            <div class="auth-tabs">
+                <button id="tab-login" class="auth-tab active">Вход</button>
+                <button id="tab-register" class="auth-tab">Регистрация</button>
+            </div>
+            
+            <div id="avatar-setup" class="hidden">
+                <p style="color: var(--text-muted); font-weight: 500; margin-bottom: 10px;">Твой аватар:</p>
+                <div class="emoji-picker-container">
+                    <input type="text" id="reg-emoji" value="😊" maxlength="2">
+                    <div class="color-options">
+                        <div class="color-dot active" data-color="sky"></div>
+                        <div class="color-dot" data-color="dark"></div>
+                        <div class="color-dot" data-color="neon"></div>
+                        <div class="color-dot rainbow-dot" title="Свой цвет">
+                            🎨
+                            <input type="color" id="custom-color-picker" value="#ff3b30">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="auth-form">
+                <input type="text" id="auth-username" placeholder="@username" autocomplete="off" maxlength="20">
+                
+                <div id="register-extra-fields" class="hidden" style="width: 100%;">
+                    <input type="text" id="reg-first-name" placeholder="Имя" maxlength="15">
+                    <input type="text" id="reg-last-name" placeholder="Фамилия" maxlength="15">
+                    <input type="text" id="reg-bio" placeholder="О себе (описание)" maxlength="100">
+                    
+                    <p style="color: var(--text-muted); text-align: left; margin: 12px 0 4px 10px; font-size: 13px;">Дата рождения:</p>
+                    <input type="date" id="reg-dob" style="margin-top:0;">
+                    
+                    <p style="color: var(--text-muted); text-align: left; margin: 12px 0 4px 10px; font-size: 13px;">Пол:</p>
+                    <select id="reg-gender" style="margin-top: 0;">
+                        <option value="male">Мужской</option>
+                        <option value="female">Женский</option>
+                    </select>
+                    
+                    <p style="color: var(--text-muted); text-align: left; margin: 12px 0 4px 10px; font-size: 13px;">Видимость в поиске:</p>
+                    <select id="reg-privacy" style="margin-top: 0;">
+                        <option value="public">Все (по имени и нику)</option>
+                        <option value="private">Только по точному @нику</option>
+                    </select>
+                </div>
+
+                <input type="password" id="auth-password" placeholder="Пароль">
+                <button id="btn-login" class="btn-primary">Войти в аккаунт</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="main-screen" class="screen">
+        <header class="transparent-header">
+            <div class="glass-pill" style="height: 45px; padding: 0 20px; display: flex; align-items: center;">
+                <h3 style="margin: 0; font-size: 18px; font-weight: 600;">Чаты</h3>
+            </div>
+            <button id="btn-add-contact" class="glass-circle-btn">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </button>
+        </header>
+
+        <div id="tab-chats" class="tab-content active list-container">
+            <div class="empty-state">Нет active чатов. Воздух чист 💨</div>
+        </div>
+
+        <div id="tab-settings" class="tab-content list-container">
+            <div class="profile-header">
+                <div class="avatar-container">
+                    <div id="my-avatar" class="avatar-large emoji-avatar" data-color="sky">😊</div>
+                </div>
+                <h3 id="my-username">@username</h3>
+            </div>
+            <div class="settings-list">
+                <button id="btn-edit-my-profile" class="btn-setting">Настройки профиля ⚙️</button>
+                <div class="btn-setting theme-setting">
+                    <span>Тёмная тема 🌙</span>
+                    <label class="switch">
+                        <input type="checkbox" id="theme-toggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <button id="btn-logout" class="btn-setting danger">Выйти из аккаунта</button>
+                <button id="btn-delete-acc" class="btn-setting danger" style="background: rgba(255,59,48,0.1); border: none;">Удалить аккаунт</button>
+            </div>
+        </div>
+
+        <nav class="glass-tab-bar">
+            <button class="tab-btn active" data-target="tab-chats">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                Чаты
+            </button>
+            <button class="tab-btn" data-target="tab-settings">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                Настройки
+            </button>
+        </nav>
+    </div>
+
+    <div id="chat-screen" class="screen">
+        <header class="transparent-header">
+            <button id="btn-back-to-main" class="glass-circle-btn">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            
+            <div class="glass-pill title-pill" style="padding: 4px 20px; cursor: pointer;">
+                <div class="title-container">
+                    <h3 id="chat-title" style="margin:0; font-size: 16px; font-weight: 600; max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Имя</h3>
+                    <span id="chat-subtitle" class="chat-status"></span>
+                </div>
+            </div>
+            
+            <div class="glass-pill action-pill" style="cursor: pointer;">
+                <button id="btn-call" class="btn-icon" style="padding: 6px;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                </button>
+                <div class="avatar-container">
+                    <div id="chat-header-avatar" class="emoji-avatar" style="width: 36px; height: 36px; font-size: 18px;">🤖</div>
+                    <div id="chat-header-online-dot" class="online-dot hidden"></div>
+                </div>
+            </div>
+        </header>
+
+        <div id="chat-messages" class="messages-container"></div>
+
+        <footer class="transparent-footer">
+            <div class="message-pill">
+                <button class="btn-icon add-file-btn">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                </button>
+                <textarea id="message-input" rows="1" placeholder="Сообщение..."></textarea>
+                <button id="btn-send-msg" class="btn-send">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
+                </button>
+            </div>
+        </footer>
+    </div>
+
+    <div id="user-profile-screen" class="screen">
+        <header class="transparent-header">
+            <button id="btn-back-from-profile" class="glass-circle-btn">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            <div class="glass-pill title-pill" style="padding: 4px 20px;">
+                <div class="title-container">
+                    <h3 style="margin:0; font-size: 16px; font-weight: 600;">Профиль</h3>
+                </div>
+            </div>
+            <button id="btn-profile-more" class="glass-circle-btn">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="1.5"></circle><circle cx="12" cy="5" r="1.5"></circle><circle cx="12" cy="19" r="1.5"></circle></svg>
+            </button>
+        </header>
+        
+        <div class="list-container" style="padding-top: 100px; text-align: center;">
+            <div class="avatar-container" style="margin-bottom: 15px;">
+                <div id="profile-avatar" class="avatar-large emoji-avatar">🤖</div>
+            </div>
+            <div style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 5px;">
+                <h2 id="profile-fullname" style="margin: 0; font-size: 22px; font-weight: 700;">Имя Фамилия</h2>
+                <button id="btn-edit-contact-name" class="glass-circle-btn" style="width: 34px; height: 34px; min-width: 34px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                </button>
+            </div>
+            <p id="profile-username" style="color: var(--text-muted); font-size: 15px; margin-bottom: 25px;">@username</p>
+            
+            <div class="settings-list" style="text-align: left;">
+                <div class="btn-setting" style="cursor: default;">
+                    <span style="color: var(--text-muted); font-size: 12px; display: block; margin-bottom: 2px;">О себе</span>
+                    <span id="profile-bio" style="font-size: 16px; font-weight: 500;">Нет описания</span>
+                </div>
+                <div class="btn-setting" style="cursor: default;">
+                    <span style="color: var(--text-muted); font-size: 12px; display: block; margin-bottom: 2px;">Дата рождения</span>
+                    <span id="profile-dob" style="font-size: 16px; font-weight: 500;">Не указана</span>
+                </div>
+                <div class="btn-setting" style="cursor: default;">
+                    <span style="color: var(--text-muted); font-size: 12px; display: block; margin-bottom: 2px;">Пол</span>
+                    <span id="profile-gender" style="font-size: 16px; font-weight: 500;">Не указан</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="edit-profile-modal" class="screen alert-overlay">
+        <div class="glass-card" style="width: 90%; max-width: 400px; padding: 25px; display: flex; flex-direction: column; text-align: left;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0; font-size: 18px;">Профиль</h3>
+                <button id="btn-close-edit-profile" class="btn-icon" style="font-size: 16px; padding: 5px;">❌</button>
+            </div>
+            <div style="max-height: 65vh; overflow-y: auto; padding-right: 5px;">
+                <p style="color: var(--text-muted); margin-bottom: 5px; font-size: 13px;">Аватар и стиль:</p>
+                <div class="emoji-picker-container" style="display: flex; flex-direction: column; align-items: center; margin-bottom: 10px;">
+                    <input type="text" id="edit-emoji" value="😊" maxlength="2" style="width: 65px; height: 65px; text-align: center; font-size: 32px; border-radius: 25px; margin: 0 auto; color: white; border: none; box-shadow: var(--shadow-sm);">
+                    <div class="color-options" id="edit-color-options">
+                        <div class="color-dot" data-color="sky"></div>
+                        <div class="color-dot" data-color="dark"></div>
+                        <div class="color-dot" data-color="neon"></div>
+                        <div class="color-dot rainbow-dot" title="Свой цвет">
+                            🎨
+                            <input type="color" id="edit-custom-color-picker" value="#ff3b30">
+                        </div>
+                    </div>
+                </div>
+                
+                <input type="text" id="edit-first-name" placeholder="Имя" maxlength="15">
+                <input type="text" id="edit-last-name" placeholder="Фамилия" maxlength="15">
+                <input type="text" id="edit-bio" placeholder="Расскажи о себе..." maxlength="100">
+                
+                <p style="color: var(--text-muted); margin-top: 12px; margin-bottom: 4px; font-size: 13px;">Дата рождения:</p>
+                <input type="date" id="edit-dob" style="margin-top:0;">
+                
+                <p style="color: var(--text-muted); margin-top: 12px; margin-bottom: 4px; font-size: 13px;">Пол:</p>
+                <select id="edit-gender" style="margin-top: 0;">
+                    <option value="male">Мужской</option>
+                    <option value="female">Женский</option>
+                </select>
+                
+                <p style="color: var(--text-muted); margin-top: 12px; margin-bottom: 4px; font-size: 13px;">Кто может меня найти:</p>
+                <select id="edit-privacy" style="margin-top: 0;">
+                    <option value="public">Все (по имени и нику)</option>
+                    <option value="private">Только по точному @нику</option>
+                </select>
+                
+                <button id="btn-save-profile" class="btn-primary" style="margin-top: 20px;">Сохранить изменения</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="custom-name-modal" class="screen alert-overlay">
+        <div class="glass-card alert-card">
+            <h3>Имя контакта</h3>
+            <input type="text" id="custom-name-input" placeholder="Введите имя..." maxlength="20" style="margin-top: 5px;">
+            <div class="alert-actions" style="margin-top: 20px;">
+                <button id="btn-custom-name-cancel" class="btn-secondary">Отмена</button>
+                <button id="btn-custom-name-save" class="btn-primary">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="message-menu-modal" class="screen alert-overlay">
+        <div class="glass-card alert-card">
+            <h3>Действие с сообщением</h3>
+            <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
+                <button id="btn-msg-edit" class="btn-secondary" style="margin-top: 0; padding: 16px;">Изменить</button>
+                <button id="btn-msg-delete-me" class="btn-setting danger" style="margin: 0; padding: 16px; border-radius: 25px;">Удалить у себя</button>
+                <button id="btn-msg-delete-all" class="btn-setting danger" style="margin: 0; padding: 16px; border-radius: 25px; background: rgba(255,59,48,0.15);">Удалить у всех</button>
+                <button id="btn-msg-cancel" class="btn-secondary" style="margin-top: 5px; padding: 16px;">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="profile-menu-modal" class="screen alert-overlay">
+        <div class="glass-card alert-card">
+            <h3>Удаление чата</h3>
+            <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
+                <button id="btn-chat-delete-me" class="btn-setting danger" style="margin: 0; padding: 16px; border-radius: 25px;">Удалить у себя</button>
+                <button id="btn-chat-delete-all" class="btn-setting danger" style="margin: 0; padding: 16px; border-radius: 25px; background: rgba(255,59,48,0.15);">Удалить у всех</button>
+                <button id="btn-chat-cancel" class="btn-secondary" style="margin-top: 5px; padding: 16px;">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="search-modal" class="screen alert-overlay">
+        <div class="glass-card" style="width: 90%; max-width: 400px; padding: 25px; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0; font-size: 18px;">Новый чат</h3>
+                <button id="btn-close-search" class="btn-icon" style="font-size: 16px; padding: 5px;">❌</button>
+            </div>
+            <input type="text" id="search-input" placeholder="Поиск по нику или имени..." autocomplete="off">
+            <div id="search-results" class="list-container" style="padding: 15px 0 0 0; max-height: 300px; overflow-y: auto;">
+                <div class="empty-state" style="margin-top: 20px; font-size: 14px;">Введи ник для поиска</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="custom-alert" class="screen alert-overlay">
+        <div class="glass-card alert-card">
+            <h3 id="alert-text"></h3>
+            <div class="alert-actions">
+                <button id="btn-alert-cancel" class="btn-secondary hidden">Отмена</button>
+                <button id="btn-alert-ok" class="btn-primary" style="margin-top: 0;">ОК</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
