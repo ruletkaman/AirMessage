@@ -29,10 +29,10 @@ body.dark-mode {
 /* Сброс */
 * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
 body, html { width: 100%; height: 100%; background-color: var(--bg-color); color: var(--text-main); overflow: hidden; transition: background-color 0.4s ease; }
-body { display: flex; justify-content: center; align-items: center; background-image: radial-gradient(circle at 50% 50%, #f7fbff 0%, #d7e6f5 52%, #b9c9dc 100%); }
-body.dark-mode { background-image: radial-gradient(circle at 50% 50%, #20222b 0%, #101116 54%, #000000 100%); }
-#app-shell { position: relative; width: min(100vw, 420px); height: 100dvh; max-height: 900px; overflow: hidden; background: var(--bg-color); border-radius: clamp(0px, calc((100vw - 420px) * 999), 36px); box-shadow: 0 30px 80px rgba(38, 70, 105, 0.22); }
-body.dark-mode #app-shell { box-shadow: 0 30px 90px rgba(0, 0, 0, 0.45); }
+body { display: flex; justify-content: center; align-items: center; background: var(--bg-color); }
+body.dark-mode { background: var(--bg-color); }
+#app-shell { position: relative; width: 100vw; height: 100dvh; max-width: none; border-radius: 0; box-shadow: none; overflow: hidden; background: var(--bg-color); }
+body.dark-mode #app-shell { box-shadow: none; }
 
 .app-preloader { position: fixed; inset: 0; z-index: 20000; display: flex; align-items: center; justify-content: center; background: var(--bg-color); transition: opacity 0.45s ease, visibility 0.45s ease; }
 .app-preloader.hide { opacity: 0; visibility: hidden; pointer-events: none; }
@@ -48,7 +48,7 @@ body.dark-mode #app-shell { box-shadow: 0 30px 90px rgba(0, 0, 0, 0.45); }
 #main-screen.shifted { transform: translateX(-25%); opacity: 0.4; pointer-events: none; }
 
 /* --- ПАРЯЩАЯ ШАПКА --- */
-.transparent-header { position: absolute; top: 0; left: 0; width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 15px; z-index: 100; background: transparent; padding-top: calc(15px + env(safe-area-inset-top)); }
+.transparent-header { position: fixed; top: 0; left: 0; width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 15px; z-index: 100; background: transparent; padding-top: calc(15px + env(safe-area-inset-top)); }
 .glass-circle-btn { width: 45px; height: 45px; border-radius: 50%; background: rgba(235, 235, 240, 0.85); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); border: 1px solid var(--glass-border); box-shadow: var(--shadow-sm); display: flex; justify-content: center; align-items: center; color: var(--accent-color); cursor: pointer; outline: none; transition: 0.2s; }
 body.dark-mode .glass-circle-btn { background: rgba(30, 30, 32, 0.85); }
 .glass-circle-btn:active { transform: scale(0.95); }
@@ -96,7 +96,7 @@ select option { background: var(--bg-color); color: var(--text-main); }
 body.dark-mode select option { background: #1e1e20; color: white; }
 
 /* --- СООБЩЕНИЯ В ЧАТЕ (Компактный дизайн) --- */
-.messages-container { flex: 1; overflow-y: auto; padding: 90px 15px 90px 15px; display: flex; flex-direction: column; gap: 10px; }
+.messages-container { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 90px 15px 90px 15px; display: flex; flex-direction: column; gap: 10px; }
 .message { max-width: 82%; padding: 7px 12px; border-radius: 20px; font-size: 15px; line-height: 1.35; position: relative; display: flex; flex-direction: column; transition: 0.2s; user-select: none; -webkit-user-select: none; }
 .msg-content { word-wrap: break-word; }
 .message.mine { align-self: flex-end; background: var(--accent-gradient); color: white; border-bottom-right-radius: 6px; }
@@ -114,7 +114,7 @@ body.dark-mode select option { background: #1e1e20; color: white; }
 .msg-meta svg { width: 16px; height: 16px; min-width: 16px; margin-bottom: -2px; }
 
 /* --- ПЛАВАЮЩИЙ ФУТЕР ЧАТА --- */
-.transparent-footer { position: absolute; bottom: 0; left: 0; width: 100%; padding: 10px 15px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); background: transparent; z-index: 100; }
+.transparent-footer { position: fixed; bottom: 0; left: 0; width: 100%; padding: 10px 15px; padding-bottom: calc(15px + env(safe-area-inset-bottom)); background: transparent; z-index: 100; }
 .message-pill { display: flex; align-items: flex-end; background: rgba(235, 235, 240, 0.85); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); border-radius: 25px; padding: 6px 6px 6px 12px; border: 1px solid var(--glass-border); box-shadow: var(--shadow-lg); }
 body.dark-mode .message-pill { background: rgba(30, 30, 32, 0.85); }
 #message-input { 
