@@ -2,7 +2,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, deleteUser } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, serverTimestamp, deleteDoc, collection, query, where, getDocs, onSnapshot, addDoc, orderBy, enableIndexedDbPersistence, increment, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 import { getDatabase, ref as rtdbRef, set as rtdbSet, onValue, onDisconnect, serverTimestamp as rtdbServerTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
-import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAQbze_wKkHFdBbWq0FHAgKOiFn07x4OrU",
@@ -18,11 +17,6 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const rtdb = getDatabase(app);
-const FCM_VAPID_KEY = "BKpLSFZFmnxrhdJXg04vZt34n6jtS3FH1bT7oqIc6fWtIIodK7bzDill5VASjho1VEfZjIQ_Dv0WerDkS8JuWjs";
-let messaging = null;
-let messagingReady = null;
-let serviceWorkerRegistration = null;
-let foregroundPushTimeout = null;
 
 enableIndexedDbPersistence(db).catch(err => console.log("Persistence failed"));
 
@@ -52,8 +46,7 @@ const screens = {
     main: document.getElementById('main-screen'), 
     chat: document.getElementById('chat-screen'), 
     profile: document.getElementById('user-profile-screen'),
-    alert: document.getElementById('custom-alert'),
-    notification: document.getElementById('notification-permission-modal')
+    alert: document.getElementById('custom-alert') 
 };
 
 const gradients = { 
@@ -171,77 +164,6 @@ function showCustomAlert(msg, isConfirm = false) {
         document.getElementById('btn-alert-cancel').onclick = () => { screens.alert.classList.remove('active'); res(false); };
     });
 }
-
-async function prepareMessaging() {
-    if (messagingReady) return messagingReady;
-    messagingReady = (async () => {
-        if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) return null;
-        const supported = await isMessagingSupported();
-        if (!supported) return null;
-        serviceWorkerRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-        messaging = getMessaging(app);
-        onMessage(messaging, (payload) => {
-            const payloadChatId = payload?.data?.chatId || payload?.data?.chat_id || '';
-            if (payloadChatId && payloadChatId === currentChatId) return;
-            const title = payload?.notification?.title || payload?.data?.title || 'Новое сообщение';
-            const body = payload?.notification?.body || payload?.data?.body || payload?.data?.text || '';
-            showForegroundPushAlert(title, body);
-        });
-        return messaging;
-    })().catch((err) => {
-        console.log('Messaging init failed', err);
-        return null;
-    });
-    return messagingReady;
-}
-
-function showNotificationPermissionModal() {
-    const modal = document.getElementById('notification-permission-modal');
-    if (!modal || Notification.permission !== 'default') return;
-    modal.classList.add('active');
-}
-
-function hideNotificationPermissionModal() {
-    const modal = document.getElementById('notification-permission-modal');
-    if (modal) modal.classList.remove('active');
-}
-
-async function syncFcmToken() {
-    if (!auth.currentUser) return;
-    const activeMessaging = await prepareMessaging();
-    if (!activeMessaging || Notification.permission !== 'granted') return;
-    const token = await getToken(activeMessaging, {
-        vapidKey: FCM_VAPID_KEY,
-        serviceWorkerRegistration
-    });
-    if (token) {
-        await setDoc(doc(db, 'users', auth.currentUser.uid), {
-            fcmToken: token,
-            fcmTokenUpdatedAt: serverTimestamp()
-        }, { merge: true });
-    }
-}
-
-async function requestNotificationPermission() {
-    hideNotificationPermissionModal();
-    const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-        await syncFcmToken();
-    }
-}
-
-function showForegroundPushAlert(title, body) {
-    const alert = document.getElementById('foreground-push-alert');
-    if (!alert) return;
-    document.getElementById('foreground-push-title').innerText = title || 'Новое сообщение';
-    document.getElementById('foreground-push-body').innerText = body || 'Откройте чат, чтобы прочитать сообщение.';
-    alert.classList.remove('hidden');
-    clearTimeout(foregroundPushTimeout);
-    foregroundPushTimeout = setTimeout(() => alert.classList.add('hidden'), 4200);
-}
-
-document.getElementById('btn-notification-allow')?.addEventListener('click', requestNotificationPermission);
-document.getElementById('btn-notification-later')?.addEventListener('click', hideNotificationPermissionModal);
 
 // Регистрация / Авторизация (Логика UI)
 let isLoginMode = true; let selectedColor = 'sky'; let isCustomColor = false; let registerStep = 1;
@@ -433,11 +355,6 @@ onAuthStateChanged(auth, async (user) => {
         setUserOnline(user.uid);
         startChatListTimeout();
         listenToChatList(); 
-        prepareMessaging().then((activeMessaging) => {
-            if (!activeMessaging || !('Notification' in window)) return;
-            if (Notification.permission === 'default') showNotificationPermissionModal();
-            if (Notification.permission === 'granted') syncFcmToken();
-        });
         
         onSnapshot(doc(db, 'users', user.uid), (snap) => {
             if (snap.exists()) {
