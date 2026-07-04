@@ -18,7 +18,11 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const rtdb = getDatabase(app);
 
-enableIndexedDbPersistence(db).catch(err => console.log("Persistence failed"));
+try {
+    await enableIndexedDbPersistence(db);
+} catch (err) {
+    console.log("Persistence failed", err);
+}
 
 // Глобальные переменные
 let currentChatId = null;
@@ -356,6 +360,10 @@ onAuthStateChanged(auth, async (user) => {
         startChatListTimeout();
         listenToChatList(); 
         
+        if ('Notification' in window && Notification.permission === 'granted') {
+            setupWebPush();
+        }
+        
         onSnapshot(doc(db, 'users', user.uid), (snap) => {
             if (snap.exists()) {
                 currentUserData = snap.data();
@@ -530,19 +538,29 @@ function listenToChatList() {
     unsubscribeChats = onSnapshot(q, async (snapshot) => {
         markChatListArrived();
         const tabChats = document.getElementById('tab-chats');
-        if (snapshot.empty) { tabChats.innerHTML = '<div class="empty-state">Нет active чатов. Воздух чист 💨</div>'; return; }
+        if (snapshot.empty && !snapshot.metadata.fromCache) { tabChats.innerHTML = '<div class="empty-state">Нет active чатов. Воздух чист 💨</div>'; return; }
+        if (snapshot.empty && snapshot.metadata.fromCache) return; // Не моргаем пустым экраном при первой загрузке из пустого кэша
 
         let chats = [];
         snapshot.forEach(docSnap => chats.push({ id: docSnap.id, data: docSnap.data() }));
         chats.sort((a, b) => (b.data.updatedAt?.toMillis() || 0) - (a.data.updatedAt?.toMillis() || 0));
 
+        const fetchPromises = [];
         for (let chat of chats) {
             const otherUserId = chat.data.participants.find(id => id !== auth.currentUser.uid);
             if (otherUserId && !userCache[otherUserId]) {
-                const userSnap = await getDoc(doc(db, 'users', otherUserId));
-                if (userSnap.exists()) { userCache[otherUserId] = userSnap.data(); userCache[otherUserId].uid = otherUserId; }
+                const p = getDoc(doc(db, 'users', otherUserId))
+                    .then(userSnap => {
+                        if (userSnap.exists()) { 
+                            userCache[otherUserId] = userSnap.data(); 
+                            userCache[otherUserId].uid = otherUserId; 
+                        }
+                    })
+                    .catch(e => console.error("Error fetching user", e));
+                fetchPromises.push(p);
             }
         }
+        await Promise.all(fetchPromises);
 
         const fragment = document.createDocumentFragment();
         for (let chat of chats) {
@@ -837,6 +855,53 @@ editUi.btnSave.onclick = async () => {
     editUi.btnSave.disabled = false; editUi.btnSave.innerText = 'Сохранить изменения';
 };
 
+// Утилита для VAPID-ключей
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+}
+
+async function setupWebPush() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    try {
+        const registration = await navigator.serviceWorker.register('sw.js');
+        await navigator.serviceWorker.ready;
+        
+        let subscription = await registration.pushManager.getSubscription();
+        if (!subscription) {
+            // Внимание: Здесь должен быть настоящий Public VAPID Key с вашего сервера
+            const publicVapidKey = 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuB24lO7yX0D3N2Gk1kX-D0Lz4'; // Пример
+            subscription = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
+            });
+        }
+        
+        if (auth.currentUser) {
+            await setDoc(doc(db, 'users', auth.currentUser.uid), {
+                pushSubscriptions: arrayUnion(subscription.toJSON())
+            }, { merge: true });
+        }
+    } catch (err) {
+        console.error('Web Push setup failed', err);
+    }
+}
+
+// Общение с Service Worker для защиты от спама
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', event => {
+        if (event.data && event.data.type === 'GET_CHAT_ID') {
+            event.ports[0].postMessage({ chatId: document.visibilityState === 'visible' ? currentChatId : null });
+        }
+    });
+}
+
 // Нативные Push-уведомления (iOS 16.4+ PWA / Android / Desktop)
 document.getElementById('btn-enable-notifications').onclick = async () => {
     // 1. Проверяем, поддерживает ли браузер Notification API
@@ -863,6 +928,7 @@ document.getElementById('btn-enable-notifications').onclick = async () => {
 
         if (result === 'granted') {
             showCustomAlert('Уведомления успешно включены! 🎉');
+            await setupWebPush();
             // Тестовое уведомление, чтобы пользователь увидел результат
             new Notification('Air Messenger', {
                 body: 'Теперь вы будете получать уведомления о новых сообщениях ✉️',
