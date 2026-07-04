@@ -16,6 +16,11 @@
 </head>
 <body>
 
+    <div id="app-preloader" class="app-preloader">
+        <div class="cloud-logo preloader-logo">☁️</div>
+    </div>
+
+    <main id="app-shell">
     <div id="onboarding-screen" class="screen">
         <div class="glass-card center-content">
             <div class="cloud-logo">☁️</div>
@@ -32,48 +37,64 @@
                 <button id="tab-login" class="auth-tab active">Вход</button>
                 <button id="tab-register" class="auth-tab">Регистрация</button>
             </div>
-            
-            <div id="avatar-setup" class="hidden">
-                <p style="color: var(--text-muted); font-weight: 500; margin-bottom: 10px;">Твой аватар:</p>
-                <div class="emoji-picker-container">
-                    <input type="text" id="reg-emoji" value="😊" maxlength="2">
-                    <div class="color-options">
-                        <div class="color-dot active" data-color="sky"></div>
-                        <div class="color-dot" data-color="dark"></div>
-                        <div class="color-dot" data-color="neon"></div>
-                        <div class="color-dot rainbow-dot" title="Свой цвет">
-                            🎨
-                            <input type="color" id="custom-color-picker" value="#ff3b30">
-                        </div>
-                    </div>
-                </div>
-            </div>
 
             <div class="auth-form">
-                <input type="text" id="auth-username" placeholder="@username" autocomplete="off" maxlength="20">
+                <div id="auth-credentials-step" class="register-step active" data-step="1">
+                    <input type="text" id="auth-username" placeholder="@username" autocomplete="off" maxlength="20">
+                    <input type="password" id="auth-password" placeholder="Пароль">
+                    <input type="password" id="auth-password-confirm" class="register-only hidden" placeholder="Повторите пароль">
+                </div>
                 
                 <div id="register-extra-fields" class="hidden" style="width: 100%;">
-                    <input type="text" id="reg-first-name" placeholder="Имя" maxlength="15">
-                    <input type="text" id="reg-last-name" placeholder="Фамилия" maxlength="15">
-                    <input type="text" id="reg-bio" placeholder="О себе (описание)" maxlength="100">
-                    
-                    <p style="color: var(--text-muted); text-align: left; margin: 12px 0 4px 10px; font-size: 13px;">Дата рождения:</p>
-                    <input type="date" id="reg-dob" style="margin-top:0;">
-                    
-                    <p style="color: var(--text-muted); text-align: left; margin: 12px 0 4px 10px; font-size: 13px;">Пол:</p>
-                    <select id="reg-gender" style="margin-top: 0;">
-                        <option value="male">Мужской</option>
-                        <option value="female">Женский</option>
-                    </select>
-                    
-                    <p style="color: var(--text-muted); text-align: left; margin: 12px 0 4px 10px; font-size: 13px;">Видимость в поиске:</p>
-                    <select id="reg-privacy" style="margin-top: 0;">
-                        <option value="public">Все (по имени и нику)</option>
-                        <option value="private">Только по точному @нику</option>
-                    </select>
+                    <div class="wizard-progress">
+                        <span class="wizard-dot active" data-step="1"></span>
+                        <span class="wizard-dot" data-step="2"></span>
+                        <span class="wizard-dot" data-step="3"></span>
+                    </div>
+
+                    <div class="register-step" data-step="2">
+                        <input type="text" id="reg-first-name" placeholder="Имя" maxlength="15">
+                        <input type="text" id="reg-last-name" placeholder="Фамилия" maxlength="15">
+                    </div>
+
+                    <div class="register-step" data-step="3">
+                        <div id="avatar-setup">
+                            <p style="color: var(--text-muted); font-weight: 500; margin-bottom: 10px;">Твой аватар:</p>
+                            <div class="emoji-picker-container">
+                                <input type="text" id="reg-emoji" value="😊" maxlength="2">
+                                <div class="color-options">
+                                    <div class="color-dot active" data-color="sky"></div>
+                                    <div class="color-dot" data-color="dark"></div>
+                                    <div class="color-dot" data-color="neon"></div>
+                                    <div class="color-dot rainbow-dot" title="Свой цвет">
+                                        🎨
+                                        <input type="color" id="custom-color-picker" value="#ff3b30">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <p style="color: var(--text-muted); text-align: left; margin: 12px 0 4px 10px; font-size: 13px;">Пол:</p>
+                        <select id="reg-gender" style="margin-top: 0;">
+                            <option value="male">Мужской</option>
+                            <option value="female">Женский</option>
+                        </select>
+                        
+                        <p style="color: var(--text-muted); text-align: left; margin: 12px 0 4px 10px; font-size: 13px;">Дата рождения:</p>
+                        <input type="date" id="reg-dob" style="margin-top:0;">
+                        
+                        <p style="color: var(--text-muted); text-align: left; margin: 12px 0 4px 10px; font-size: 13px;">Видимость в поиске:</p>
+                        <select id="reg-privacy" style="margin-top: 0;">
+                            <option value="public">Все (по имени и нику)</option>
+                            <option value="private">Только по точному @нику</option>
+                        </select>
+                    </div>
                 </div>
 
-                <input type="password" id="auth-password" placeholder="Пароль">
+                <div id="register-nav" class="wizard-actions hidden">
+                    <button id="btn-register-prev" class="btn-secondary" type="button">Назад</button>
+                    <button id="btn-register-next" class="btn-primary" type="button">Далее</button>
+                </div>
                 <button id="btn-login" class="btn-primary">Войти в аккаунт</button>
             </div>
         </div>
@@ -310,6 +331,7 @@
             </div>
         </div>
     </div>
+    </main>
 
     <script type="module" src="app.js"></script>
 </body>

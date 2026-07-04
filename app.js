@@ -1,10 +1,12 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, deleteUser } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, serverTimestamp, deleteDoc, collection, query, where, getDocs, onSnapshot, addDoc, orderBy, enableIndexedDbPersistence, increment, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { getDatabase, ref as rtdbRef, set as rtdbSet, onValue, onDisconnect, serverTimestamp as rtdbServerTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAQbze_wKkHFdBbWq0FHAgKOiFn07x4OrU",
   authDomain: "airmessage-49c55.firebaseapp.com",
+  databaseURL: "https://airmessage-49c55-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "airmessage-49c55",
   storageBucket: "airmessage-49c55.firebasestorage.app",
   messagingSenderId: "697695491479",
@@ -14,6 +16,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const rtdb = getDatabase(app);
 
 enableIndexedDbPersistence(db).catch(err => console.log("Persistence failed"));
 
@@ -27,7 +30,8 @@ let unsubscribeChats = null;
 let unsubscribeChatHeader = null;
 let unsubscribeUserOnline = null;
 let currentOnlineStatusText = ''; 
-let heartbeatInterval = null; 
+let chatListTimeout = null;
+let chatListArrived = false;
 const userCache = {}; 
 
 // Хранилище контекста для долгого тапа сообщений
@@ -77,8 +81,17 @@ function formatTime(date) {
     return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 }
 
+function toDate(value) {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (typeof value === 'number') return new Date(value);
+    if (typeof value.toDate === 'function') return value.toDate();
+    return null;
+}
+
 // Обновленная функция для правильных окончаний
 function formatLastSeen(date, gender) {
+    date = toDate(date);
     let word = 'был(а)';
     if (gender === 'male') word = 'был';
     if (gender === 'female') word = 'была';
@@ -103,28 +116,36 @@ function getContactDisplayName(userId, contactData) {
 const checkSent = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 5 6 12 3 9"></polyline></svg>`;
 const checkRead = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="11 5 4 12 1 9"></polyline><path d="M16 5l-7 7"></path></svg>`;
 
-// СИСТЕМА ОНЛАЙНА И ПУЛЬСА
-document.addEventListener('visibilitychange', () => {
-    if (!auth.currentUser) return;
-    const isOnline = document.visibilityState === 'visible';
-    if (!isOnline) updateTypingState(null); 
-    setDoc(doc(db, 'users', auth.currentUser.uid), { isOnline: isOnline, lastSeen: serverTimestamp() }, { merge: true });
-});
+function hidePreloader() {
+    const preloader = document.getElementById('app-preloader');
+    if (!preloader) return;
+    preloader.classList.add('hide');
+    setTimeout(() => { preloader.style.display = 'none'; }, 500);
+}
 
-window.addEventListener('beforeunload', () => {
-    if (auth.currentUser) {
-        updateTypingState(null);
-        setDoc(doc(db, 'users', auth.currentUser.uid), { isOnline: false, lastSeen: serverTimestamp() }, { merge: true });
-    }
-});
+function setUserOnline(uid) {
+    const statusRef = rtdbRef(rtdb, `status/${uid}`);
+    onDisconnect(statusRef).set({ isOnline: false, lastSeen: rtdbServerTimestamp() });
+    return rtdbSet(statusRef, { isOnline: true, lastSeen: rtdbServerTimestamp() });
+}
 
-function startHeartbeat() {
-    if (heartbeatInterval) clearInterval(heartbeatInterval);
-    heartbeatInterval = setInterval(() => {
-        if (auth.currentUser && document.visibilityState === 'visible') {
-            setDoc(doc(db, 'users', auth.currentUser.uid), { lastSeen: serverTimestamp(), isOnline: true }, { merge: true });
+function setUserOffline(uid) {
+    return rtdbSet(rtdbRef(rtdb, `status/${uid}`), { isOnline: false, lastSeen: rtdbServerTimestamp() });
+}
+
+function startChatListTimeout() {
+    chatListArrived = false;
+    clearTimeout(chatListTimeout);
+    chatListTimeout = setTimeout(() => {
+        if (!chatListArrived && auth.currentUser) {
+            showCustomAlert('Связь с сервером нестабильна. Попробуйте отключить VPN или проверить интернет 🛜');
         }
-    }, 60000); 
+    }, 7000);
+}
+
+function markChatListArrived() {
+    chatListArrived = true;
+    clearTimeout(chatListTimeout);
 }
 
 // Онбординг
@@ -145,16 +166,23 @@ function showCustomAlert(msg, isConfirm = false) {
 }
 
 // Регистрация / Авторизация (Логика UI)
-let isLoginMode = true; let selectedColor = 'sky'; let isCustomColor = false;
+let isLoginMode = true; let selectedColor = 'sky'; let isCustomColor = false; let registerStep = 1;
 const ui = { 
     tabLogin: document.getElementById('tab-login'), 
     tabRegister: document.getElementById('tab-register'), 
     btnLogin: document.getElementById('btn-login'), 
+    authForm: document.querySelector('.auth-form'),
+    credentialsStep: document.getElementById('auth-credentials-step'),
+    passwordConfirm: document.getElementById('auth-password-confirm'),
     avatarSetup: document.getElementById('avatar-setup'), 
     regEmoji: document.getElementById('reg-emoji'), 
     colorDots: document.querySelectorAll('#auth-screen .color-dot'), 
     colorPicker: document.getElementById('custom-color-picker'),
-    extraFields: document.getElementById('register-extra-fields')
+    extraFields: document.getElementById('register-extra-fields'),
+    registerNav: document.getElementById('register-nav'),
+    btnPrev: document.getElementById('btn-register-prev'),
+    btnNext: document.getElementById('btn-register-next'),
+    wizardDots: document.querySelectorAll('.wizard-dot')
 };
 
 function updatePreview(colorValue, isCustom) { 
@@ -180,24 +208,89 @@ ui.colorPicker.addEventListener('input', (e) => {
     updatePreview(selectedColor, true); 
 });
 
-ui.tabLogin.onclick = () => { 
-    isLoginMode = true; ui.tabLogin.classList.add('active'); ui.tabRegister.classList.remove('active'); 
-    ui.btnLogin.innerText = 'Войти в аккаунт'; ui.avatarSetup.classList.add('hidden'); ui.extraFields.classList.add('hidden');
-};
-ui.tabRegister.onclick = () => { 
-    isLoginMode = false; ui.tabRegister.classList.add('active'); ui.tabLogin.classList.remove('active'); 
-    ui.btnLogin.innerText = 'Создать аккаунт'; ui.avatarSetup.classList.remove('hidden'); ui.extraFields.classList.remove('hidden');
+function setAuthMode(loginMode) {
+    isLoginMode = loginMode;
+    ui.tabLogin.classList.toggle('active', loginMode);
+    ui.tabRegister.classList.toggle('active', !loginMode);
+    ui.authForm.classList.toggle('register-mode', !loginMode);
+    ui.extraFields.classList.toggle('hidden', loginMode);
+    ui.registerNav.classList.toggle('hidden', loginMode);
+    ui.passwordConfirm.classList.toggle('hidden', loginMode);
+    if (loginMode) {
+        ui.credentialsStep.classList.add('active');
+        ui.btnLogin.classList.remove('hidden');
+        ui.btnLogin.innerText = 'Войти в аккаунт';
+    } else {
+        registerStep = 1;
+        updateRegisterStep();
+    }
+}
+
+function updateRegisterStep() {
+    document.querySelectorAll('.auth-form .register-step').forEach(step => {
+        step.classList.toggle('active', Number(step.dataset.step) === registerStep);
+    });
+    ui.wizardDots.forEach(dot => dot.classList.toggle('active', Number(dot.dataset.step) === registerStep));
+    ui.btnPrev.classList.toggle('hidden', registerStep === 1);
+    ui.btnNext.classList.toggle('hidden', registerStep === 3);
+    ui.btnLogin.classList.toggle('hidden', registerStep !== 3);
+    ui.btnLogin.innerText = 'Создать аккаунт';
+}
+
+function validateRegisterStep(step) {
+    const user = document.getElementById('auth-username').value.trim().replace('@', '');
+    const pass = document.getElementById('auth-password').value.trim();
+    const passConfirm = ui.passwordConfirm.value.trim();
+    const fName = document.getElementById('reg-first-name').value.trim();
+    const lName = document.getElementById('reg-last-name').value.trim();
+    const usernameRegex = /^[a-zA-Z0-9]+$/;
+
+    if (step === 1) {
+        if (user.length < 3 || user.length > 20 || pass.length < 6) {
+            showCustomAlert('Ник от 3 до 20 символов, пароль от 6');
+            return false;
+        }
+        if (!usernameRegex.test(user)) {
+            showCustomAlert('Ник должен состоять только из английских букв и цифр!');
+            return false;
+        }
+        if (pass !== passConfirm) {
+            showCustomAlert('Пароли не совпадают.');
+            return false;
+        }
+    }
+
+    if (step === 2) {
+        if (!fName || !lName) {
+            showCustomAlert('Заполните Имя и Фамилию!');
+            return false;
+        }
+        if (fName.length > 15 || lName.length > 15) {
+            showCustomAlert('Имя и фамилия не должны быть длиннее 15 символов!');
+            return false;
+        }
+    }
+
+    return true;
+}
+
+ui.tabLogin.onclick = () => setAuthMode(true);
+ui.tabRegister.onclick = () => setAuthMode(false);
+ui.btnPrev.onclick = () => { if (registerStep > 1) { registerStep--; updateRegisterStep(); } };
+ui.btnNext.onclick = () => {
+    if (!validateRegisterStep(registerStep)) return;
+    if (registerStep < 3) { registerStep++; updateRegisterStep(); }
 };
 
 // Сабмит авторизации
 ui.btnLogin.addEventListener('click', async () => {
     const user = document.getElementById('auth-username').value.trim().replace('@', ''); 
     const pass = document.getElementById('auth-password').value.trim(); 
+    const passConfirm = ui.passwordConfirm.value.trim();
     const emoji = ui.regEmoji.value.trim();
     
     const fName = document.getElementById('reg-first-name').value.trim();
     const lName = document.getElementById('reg-last-name').value.trim();
-    const bioVal = document.getElementById('reg-bio').value.trim();
     const dobVal = document.getElementById('reg-dob').value;
     const genVal = document.getElementById('reg-gender').value;
     const privVal = document.getElementById('reg-privacy').value;
@@ -207,6 +300,7 @@ ui.btnLogin.addEventListener('click', async () => {
     if (!isLoginMode) {
         const usernameRegex = /^[a-zA-Z0-9]+$/;
         if (!usernameRegex.test(user)) return showCustomAlert('Ник должен состоять только из английских букв и цифр!');
+        if (pass !== passConfirm) return showCustomAlert('Пароли не совпадают.');
         if (!fName || !lName) return showCustomAlert('Заполните Имя и Фамилию!');
         if (fName.length > 15 || lName.length > 15) return showCustomAlert('Имя и фамилия не должны быть длиннее 15 символов!');
         if (!emoji) return showCustomAlert('Выберите эмодзи для аватарки!');
@@ -226,7 +320,7 @@ ui.btnLogin.addEventListener('click', async () => {
                 lastName: lName,
                 firstNameLower: fName.toLowerCase(),
                 lastNameLower: lName.toLowerCase(),
-                bio: bioVal,
+                bio: '',
                 dob: dobVal,
                 gender: genVal,
                 isPrivate: privVal === 'private',
@@ -234,8 +328,6 @@ ui.btnLogin.addEventListener('click', async () => {
                 avatarColor: selectedColor, 
                 isCustomColor: isCustomColor, 
                 createdAt: serverTimestamp(), 
-                isOnline: true, 
-                lastSeen: serverTimestamp(),
                 customNames: {}
             });
         }
@@ -259,9 +351,10 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 // Слушатель состояния сессии
 onAuthStateChanged(auth, async (user) => {
     if (user) { 
-        showScreen('main'); listenToChatList(); 
-        setDoc(doc(db, 'users', user.uid), { isOnline: true, lastSeen: serverTimestamp() }, { merge: true });
-        startHeartbeat();
+        showScreen('main');
+        setUserOnline(user.uid);
+        startChatListTimeout();
+        listenToChatList(); 
         
         onSnapshot(doc(db, 'users', user.uid), (snap) => {
             if (snap.exists()) {
@@ -278,10 +371,11 @@ onAuthStateChanged(auth, async (user) => {
             }
         });
     } else { 
-        if (heartbeatInterval) clearInterval(heartbeatInterval);
+        clearTimeout(chatListTimeout);
         currentUserData = null;
         showScreen('onboarding'); ui.btnLogin.disabled = false; ui.btnLogin.innerText = isLoginMode ? 'Войти в аккаунт' : 'Создать аккаунт';
     }
+    hidePreloader();
 });
 
 // --- ГЛОБАЛЬНАЯ ФУНКЦИЯ ОТКРЫТИЯ ЧАТА ---
@@ -292,40 +386,41 @@ function openChatRoom(chatId, userData) {
     const onlineDot = document.getElementById('chat-header-online-dot');
 
     if (unsubscribeUserOnline) unsubscribeUserOnline();
-    unsubscribeUserOnline = onSnapshot(doc(db, 'users', userData.uid), (docSnap) => {
+    let headerUserData = { ...userData };
+    const renderHeaderProfile = (uData) => {
+        document.getElementById('chat-title').innerText = getContactDisplayName(uData.uid, uData);
+        const chatHeaderAvatar = document.getElementById('chat-header-avatar');
+        chatHeaderAvatar.innerText = uData.avatarEmoji;
+        chatHeaderAvatar.style.background = (uData.isCustomColor || uData.avatarColor.startsWith('#')) ? uData.avatarColor : (gradients[uData.avatarColor] || gradients['sky']);
+    };
+    const renderOnlineStatus = (statusData = {}) => {
+        const lastSeenDate = toDate(statusData.lastSeen);
+        if (statusData.isOnline) { 
+            currentOnlineStatusText = 'в сети'; 
+            onlineDot.classList.remove('hidden'); 
+        } else { 
+            currentOnlineStatusText = formatLastSeen(lastSeenDate, headerUserData.gender); 
+            onlineDot.classList.add('hidden'); 
+        }
+        if (!chatSubtitle.classList.contains('typing')) chatSubtitle.innerText = currentOnlineStatusText;
+    };
+    renderHeaderProfile(headerUserData);
+    renderOnlineStatus();
+
+    const unsubscribeProfileHeader = onSnapshot(doc(db, 'users', userData.uid), (docSnap) => {
         if (docSnap.exists()) {
-            const uData = docSnap.data();
-            uData.uid = userData.uid;
-            
-            document.getElementById('chat-title').innerText = getContactDisplayName(uData.uid, uData);
-            const chatHeaderAvatar = document.getElementById('chat-header-avatar');
-            chatHeaderAvatar.innerText = uData.avatarEmoji;
-            chatHeaderAvatar.style.background = (uData.isCustomColor || uData.avatarColor.startsWith('#')) ? uData.avatarColor : (gradients[uData.avatarColor] || gradients['sky']);
-
-            const lastSeenDate = uData.lastSeen?.toDate();
-            const isGhost = uData.isOnline && lastSeenDate && (Date.now() - lastSeenDate.getTime() > 120000);
-
-            // Использование обновленной функции с передачей пола
-            if (uData.isOnline && !isGhost) { 
-                currentOnlineStatusText = 'в сети'; 
-                onlineDot.classList.remove('hidden'); 
-            } else { 
-                currentOnlineStatusText = formatLastSeen(lastSeenDate, uData.gender); 
-                onlineDot.classList.add('hidden'); 
-            }
-
-            if (!chatSubtitle.classList.contains('typing')) chatSubtitle.innerText = currentOnlineStatusText;
+            headerUserData = { uid: userData.uid, ...docSnap.data() };
+            renderHeaderProfile(headerUserData);
         }
     });
+    const unsubscribeStatus = onValue(rtdbRef(rtdb, `status/${userData.uid}`), (snap) => renderOnlineStatus(snap.val() || {}));
+    unsubscribeUserOnline = () => { unsubscribeProfileHeader(); unsubscribeStatus(); };
 
     if (unsubscribeChatHeader) unsubscribeChatHeader();
-    unsubscribeChatHeader = onSnapshot(doc(db, 'chats', chatId), (docSnap) => {
-        if (docSnap.exists()) {
-            const chatData = docSnap.data();
-            const typingState = chatData[`typing_${userData.uid}`];
-            if (typingState) { chatSubtitle.innerText = typingState; chatSubtitle.classList.add('typing'); } 
-            else { chatSubtitle.classList.remove('typing'); chatSubtitle.innerText = currentOnlineStatusText; }
-        }
+    unsubscribeChatHeader = onValue(rtdbRef(rtdb, `typing/${chatId}/${userData.uid}`), (snap) => {
+        const typingState = snap.val();
+        if (typingState) { chatSubtitle.innerText = typingState; chatSubtitle.classList.add('typing'); } 
+        else { chatSubtitle.classList.remove('typing'); chatSubtitle.innerText = currentOnlineStatusText; }
     });
 
     document.getElementById('chat-messages').innerHTML = ''; 
@@ -433,6 +528,7 @@ document.getElementById('btn-custom-name-save').onclick = async () => {
 function listenToChatList() {
     const q = query(collection(db, 'chats'), where('visibleTo', 'array-contains', auth.currentUser.uid));
     unsubscribeChats = onSnapshot(q, async (snapshot) => {
+        markChatListArrived();
         const tabChats = document.getElementById('tab-chats');
         if (snapshot.empty) { tabChats.innerHTML = '<div class="empty-state">Нет active чатов. Воздух чист 💨</div>'; return; }
 
@@ -472,6 +568,9 @@ function listenToChatList() {
             fragment.appendChild(card);
         }
         tabChats.innerHTML = ''; tabChats.appendChild(fragment);
+    }, () => {
+        markChatListArrived();
+        showCustomAlert('Связь с сервером нестабильна. Попробуйте отключить VPN или проверить интернет 🛜');
     });
 }
 
@@ -613,7 +712,11 @@ document.getElementById('btn-msg-delete-all').onclick = async () => {
 let lastKeyTime = 0; let typingState = null; let typingInterval = null;
 function updateTypingState(newState) {
     if (typingState === newState) return; typingState = newState;
-    if (currentChatId && auth.currentUser) setDoc(doc(db, 'chats', currentChatId), { [`typing_${auth.currentUser.uid}`]: newState }, { merge: true });
+    if (currentChatId && auth.currentUser) {
+        const typingRef = rtdbRef(rtdb, `typing/${currentChatId}/${auth.currentUser.uid}`);
+        if (newState) onDisconnect(typingRef).set(null);
+        rtdbSet(typingRef, newState);
+    }
     if (newState === null && typingInterval) { clearInterval(typingInterval); typingInterval = null; }
 }
 function checkTypingStatus() {
@@ -736,8 +839,8 @@ editUi.btnSave.onclick = async () => {
 
 // Выход из аккаунта
 document.getElementById('btn-logout').onclick = () => {
-    if (auth.currentUser) { updateTypingState(null); setDoc(doc(db, 'users', auth.currentUser.uid), { isOnline: false, lastSeen: serverTimestamp() }, { merge: true }); }
-    if (unsubscribeChats) unsubscribeChats(); if (heartbeatInterval) clearInterval(heartbeatInterval); signOut(auth);
+    if (auth.currentUser) { updateTypingState(null); setUserOffline(auth.currentUser.uid); }
+    if (unsubscribeChats) unsubscribeChats(); clearTimeout(chatListTimeout); signOut(auth);
 };
 
 // Тотальное удаление аккаунта под ноль

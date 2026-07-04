@@ -3,6 +3,7 @@
   "short_name": "Air",
   "start_url": "./",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#eef2f5",
   "theme_color": "#007aff",
   "icons": [
