@@ -837,16 +837,49 @@ editUi.btnSave.onclick = async () => {
     editUi.btnSave.disabled = false; editUi.btnSave.innerText = 'Сохранить изменения';
 };
 
-// OneSignal Уведомления
+// Нативные Push-уведомления (iOS 16.4+ PWA / Android / Desktop)
 document.getElementById('btn-enable-notifications').onclick = async () => {
-    if (window.OneSignalDeferred) {
-        OneSignalDeferred.push(async function(OneSignal) {
-            await OneSignal.Slidedown.promptPush();
-        });
-    } else {
-        showCustomAlert("OneSignal еще не загружен. Подождите пару секунд.");
+    // 1. Проверяем, поддерживает ли браузер Notification API
+    if (!('Notification' in window)) {
+        showCustomAlert('Уведомления не поддерживаются в этом браузере. Если вы на iOS — убедитесь, что приложение добавлено на экран «Домой» и версия iOS 16.4 или выше.');
+        return;
+    }
+
+    // 2. Если разрешение уже получено
+    if (Notification.permission === 'granted') {
+        showCustomAlert('Уведомления уже включены ✅');
+        return;
+    }
+
+    // 3. Если пользователь ранее запретил — iOS/Safari не покажет повторный промпт
+    if (Notification.permission === 'denied') {
+        showCustomAlert('Уведомления заблокированы. Чтобы включить их, перейдите в Настройки устройства ➔ Air Messenger ➔ Уведомления.');
+        return;
+    }
+
+    // 4. Запрашиваем разрешение (permission === 'default')
+    try {
+        const result = await Notification.requestPermission();
+
+        if (result === 'granted') {
+            showCustomAlert('Уведомления успешно включены! 🎉');
+            // Тестовое уведомление, чтобы пользователь увидел результат
+            new Notification('Air Messenger', {
+                body: 'Теперь вы будете получать уведомления о новых сообщениях ✉️',
+                icon: 'icon-512.jpg'
+            });
+        } else if (result === 'denied') {
+            showCustomAlert('Вы запретили уведомления. Чтобы включить их позже, зайдите в Настройки устройства ➔ Air Messenger ➔ Уведомления.');
+        } else {
+            // result === 'default' — пользователь закрыл промпт без выбора
+            showCustomAlert('Вы не выбрали действие. Попробуйте ещё раз.');
+        }
+    } catch (err) {
+        console.error('Notification permission error:', err);
+        showCustomAlert('Произошла ошибка при запросе уведомлений. Попробуйте ещё раз.');
     }
 };
+
 
 // Выход из аккаунта
 document.getElementById('btn-logout').onclick = () => {
