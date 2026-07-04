@@ -118,7 +118,7 @@ body.dark-mode select option { background: #1e1e20; color: white; }
 .msg-meta svg { width: 16px; height: 16px; min-width: 16px; margin-bottom: -2px; }
 
 /* --- ПЛАВАЮЩИЙ ФУТЕР ЧАТА --- */
-.transparent-footer { position: absolute; bottom: 0; left: 0; width: 100%; padding: 10px 15px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); background: transparent; z-index: 100; }
+.transparent-footer { position: absolute; bottom: 0; left: 0; width: 100%; padding: 10px 15px; padding-bottom: calc(20px + env(safe-area-inset-bottom)); background: transparent; z-index: 100; }
 .message-pill { display: flex; align-items: flex-end; background: rgba(235, 235, 240, 0.85); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); border-radius: 25px; padding: 6px 6px 6px 12px; border: 1px solid var(--glass-border); box-shadow: var(--shadow-lg); }
 body.dark-mode .message-pill { background: rgba(30, 30, 32, 0.85); }
 #message-input { 
