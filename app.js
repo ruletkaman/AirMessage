@@ -2,6 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebas
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, deleteUser } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, serverTimestamp, deleteDoc, collection, query, where, getDocs, onSnapshot, addDoc, orderBy, enableIndexedDbPersistence, increment, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 import { getDatabase, ref as rtdbRef, set as rtdbSet, onValue, onDisconnect, serverTimestamp as rtdbServerTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAQbze_wKkHFdBbWq0FHAgKOiFn07x4OrU",
@@ -17,6 +18,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const rtdb = getDatabase(app);
+const messaging = getMessaging(app);
 
 enableIndexedDbPersistence(db).catch(err => console.log("Persistence failed"));
 
@@ -46,7 +48,8 @@ const screens = {
     main: document.getElementById('main-screen'), 
     chat: document.getElementById('chat-screen'), 
     profile: document.getElementById('user-profile-screen'),
-    alert: document.getElementById('custom-alert') 
+    alert: document.getElementById('custom-alert'),
+    pushAlert: document.getElementById('push-alert-overlay')
 };
 
 const gradients = { 
@@ -355,6 +358,7 @@ onAuthStateChanged(auth, async (user) => {
         setUserOnline(user.uid);
         startChatListTimeout();
         listenToChatList(); 
+        checkPushPermissionUI();
         
         onSnapshot(doc(db, 'users', user.uid), (snap) => {
             if (snap.exists()) {
@@ -902,4 +906,78 @@ onValue(rtdbRef(rtdb, '.info/connected'), (snap) => {
     if (snap.val() === true && auth.currentUser && document.visibilityState === 'visible') {
         setUserOnline(auth.currentUser.uid);
     }
+});
+
+// --- PUSH NOTIFICATIONS LOGIC ---
+function checkPushPermissionUI() {
+    const btnSettings = document.getElementById('btn-enable-push-settings');
+    if (!btnSettings) return;
+
+    if (!('Notification' in window)) {
+        btnSettings.classList.add('hidden');
+        return;
+    }
+
+    if (Notification.permission === 'default') {
+        btnSettings.classList.remove('hidden');
+        btnSettings.innerText = 'Включить уведомления 🔔';
+        btnSettings.style.color = 'var(--accent-color)';
+        btnSettings.onclick = enablePushNotifications;
+        
+        if (!localStorage.getItem('pushAlertDismissed') && auth.currentUser) {
+            setTimeout(() => {
+                if (screens.pushAlert) screens.pushAlert.classList.add('active');
+            }, 1500);
+        }
+    } else if (Notification.permission === 'granted') {
+        btnSettings.classList.add('hidden');
+    } else if (Notification.permission === 'denied') {
+        btnSettings.classList.remove('hidden');
+        btnSettings.innerText = 'Уведомления запрещены 🔕';
+        btnSettings.style.color = 'var(--text-muted)';
+        btnSettings.onclick = () => showCustomAlert('Разрешите уведомления в настройках вашего браузера, чтобы мы могли их отправлять.');
+    }
+}
+
+async function enablePushNotifications() {
+    if (!('Notification' in window)) return;
+    try {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+            if (screens.pushAlert) screens.pushAlert.classList.remove('active');
+            checkPushPermissionUI();
+            
+            if ('serviceWorker' in navigator) {
+                try {
+                    await navigator.serviceWorker.register('./firebase-messaging-sw.js');
+                } catch(e) { console.log('SW reg error', e); }
+            }
+
+            const token = await getToken(messaging);
+            if (token && auth.currentUser) {
+                await setDoc(doc(db, 'users', auth.currentUser.uid, 'pushTokens', token), {
+                    token: token,
+                    addedAt: serverTimestamp(),
+                    device: navigator.userAgent
+                });
+            }
+            showCustomAlert('Уведомления успешно включены! 🔔');
+        } else {
+            if (screens.pushAlert) screens.pushAlert.classList.remove('active');
+            checkPushPermissionUI();
+        }
+    } catch (error) {
+        console.error('Error getting push token', error);
+        showCustomAlert('Ошибка при включении уведомлений. Возможно, требуется настройка VAPID ключа в Firebase.');
+    }
+}
+
+document.getElementById('btn-enable-push-alert')?.addEventListener('click', enablePushNotifications);
+document.getElementById('btn-close-push-alert')?.addEventListener('click', () => {
+    localStorage.setItem('pushAlertDismissed', 'true');
+    if (screens.pushAlert) screens.pushAlert.classList.remove('active');
+});
+
+onMessage(messaging, (payload) => {
+    console.log('Message received. ', payload);
 });
