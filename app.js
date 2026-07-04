@@ -360,6 +360,16 @@ onAuthStateChanged(auth, async (user) => {
         startChatListTimeout();
         listenToChatList(); 
         
+        // Резервный фикс для пустого списка чатов при первом запуске
+        setTimeout(() => {
+            const tabChats = document.getElementById('tab-chats');
+            if (tabChats && tabChats.querySelectorAll('.user-card').length === 0) {
+                console.log("Fallback: Reloading chat list...");
+                if (unsubscribeChats) unsubscribeChats();
+                listenToChatList();
+            }
+        }, 1500);
+        
         if ('Notification' in window && Notification.permission === 'granted') {
             setupWebPush();
         }
