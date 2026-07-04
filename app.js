@@ -837,6 +837,17 @@ editUi.btnSave.onclick = async () => {
     editUi.btnSave.disabled = false; editUi.btnSave.innerText = 'Сохранить изменения';
 };
 
+// OneSignal Уведомления
+document.getElementById('btn-enable-notifications').onclick = async () => {
+    if (window.OneSignalDeferred) {
+        OneSignalDeferred.push(async function(OneSignal) {
+            await OneSignal.Slidedown.promptPush();
+        });
+    } else {
+        showCustomAlert("OneSignal еще не загружен. Подождите пару секунд.");
+    }
+};
+
 // Выход из аккаунта
 document.getElementById('btn-logout').onclick = () => {
     if (auth.currentUser) { updateTypingState(null); setUserOffline(auth.currentUser.uid); }
