@@ -886,7 +886,7 @@ async function setupWebPush() {
         let subscription = await registration.pushManager.getSubscription();
         if (!subscription) {
             // Внимание: Здесь должен быть настоящий Public VAPID Key с вашего сервера
-            const publicVapidKey = 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuB24lO7yX0D3N2Gk1kX-D0Lz4'; // Пример
+            const publicVapidKey = 'BDCki2JA4B0zsL9Dmo53UXphVzknSwIrrRjcPQmNd3FRNlH1ul6RZDQuuQ2RZfcFzpum_Cxo9E3a3CJHQZsJArQ'; // Пример
             subscription = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
                 applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
