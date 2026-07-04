@@ -869,3 +869,37 @@ themeToggle.addEventListener('change', (e) => {
 });
 
 document.getElementById('btn-call').onclick = () => showCustomAlert('Здесь будет выбор: Аудио или Видео звонок 📞');
+
+// --- УПРАВЛЕНИЕ СТАТУСОМ (ОНЛАЙН/ОФФЛАЙН) ПРИ СВОРАЧИВАНИИ ---
+function handleAppVisibility() {
+    if (!auth.currentUser) return;
+    
+    if (document.visibilityState === 'hidden') {
+        // Ушли в фон - ставим оффлайн и сбрасываем набор текста
+        setUserOffline(auth.currentUser.uid);
+        updateTypingState(null);
+    } else if (document.visibilityState === 'visible') {
+        // Вернулись в приложение - ставим онлайн
+        setUserOnline(auth.currentUser.uid);
+    }
+}
+
+document.addEventListener('visibilitychange', handleAppVisibility);
+
+window.addEventListener('focus', () => {
+    if (document.visibilityState === 'visible' && auth.currentUser) {
+        setUserOnline(auth.currentUser.uid);
+    }
+});
+
+// Для iOS / PWA / Cordova
+document.addEventListener('resume', () => {
+    if (auth.currentUser) setUserOnline(auth.currentUser.uid);
+}, false);
+
+// Слушаем системный статус подключения к Firebase RTDB (надежный способ для реконнектов)
+onValue(rtdbRef(rtdb, '.info/connected'), (snap) => {
+    if (snap.val() === true && auth.currentUser && document.visibilityState === 'visible') {
+        setUserOnline(auth.currentUser.uid);
+    }
+});
